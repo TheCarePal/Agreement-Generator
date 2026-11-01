@@ -11,7 +11,7 @@ The Agreement Generator uses the existing **the-carepal** Firebase project and i
 - Downloads verify the archived snapshot and PDF hashes. Preview, download and saved-field reuse use the saved archive, with no PDF regeneration for an original download.
 - Records and PDF objects are immutable. Reusing terms starts a fresh draft and leaves saved records intact.
 
-Unfinished drafts remain in this browser. Staff sign-in uses session persistence. Closing the browser session or signing out requires signing in again. Password reset uses Firebase Authentication; the application never stores passwords in draft data or the repository.
+Unfinished drafts remain in this browser. Admin sign-in uses session persistence. Closing the browser session or signing out requires signing in again. Password reset uses Firebase Authentication; the application never stores passwords in draft data or the repository.
 
 ## Central Firebase rules
 

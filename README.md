@@ -15,7 +15,7 @@ The standard A4 template follows the supplied three-page service agreement: serv
 - Live PDF preview, zoom, printing and PDF download
 - Automatic saving of the current draft in the browser
 - Shared Firebase history, exact archived PDF downloads and saved-field/term reuse
-- Staff sign-in with the existing approved CarePal accounts
+- Admin sign-in with the existing approved CarePal accounts
 - Responsive desktop and mobile layouts
 - Static export and a GitHub Pages deployment workflow
 
@@ -48,7 +48,7 @@ PDF generation runs in the browser. The working draft uses its own `carepal-agre
 
 Only `sandeep@thecarepal.com` and `admin@thecarepal.com` can access shared history using their existing Firebase Authentication passwords. Public Web App identifiers are bundled; private keys and passwords are not. The offer and agreement apps use separate archive namespaces. See [Firebase setup and security rules](FIREBASE_SETUP.md).
 
-Local draft storage belongs to the current browser and site origin. Clearing site data or switching devices does not preserve an unfinished draft. Saved Firebase history remains available across devices after staff sign-in. If browser storage is blocked, the editor reports it; cloud saving still works. GitHub Pages serves application files without embedding entered client or caregiver data in them.
+Local draft storage belongs to the current browser and site origin. Clearing site data or switching devices does not preserve an unfinished draft. Saved Firebase history remains available across devices after admin sign-in. If browser storage is blocked, the editor reports it; cloud saving still works. GitHub Pages serves application files without embedding entered client or caregiver data in them.
 
 ## Run locally
 
