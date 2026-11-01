@@ -8,6 +8,7 @@ import {
   Download,
   FilePlus2,
   FileText,
+  History,
   LoaderCircle,
   Pencil,
   X,
@@ -25,10 +26,12 @@ import {
 } from "@/lib/agreement-storage";
 import { getPublicAssetPath } from "@/lib/public-path";
 import { AgreementDocument } from "./agreement-document";
+import { useDocumentHistory } from "./document-history";
+import { createAgreementDraftFromArchive } from "@/lib/archive-draft";
 import { AgreementForm, type FormErrors } from "./agreement-form";
 import PdfPreview from "./pdf-preview";
 
-type GeneratedPdf = { key: string; url: string };
+type GeneratedPdf = { key: string; blob: Blob; url: string };
 
 export default function AgreementCreator() {
   const [data, setData] = useState<AgreementData | null>(null);
@@ -106,7 +109,7 @@ export default function AgreementCreator() {
           const url = URL.createObjectURL(blob);
           const oldUrl = previousUrl.current;
           previousUrl.current = url;
-          setGenerated({ key: request.key, url });
+          setGenerated({ key: request.key, blob, url });
           setPdfError(null);
           if (oldUrl)
             window.setTimeout(() => URL.revokeObjectURL(oldUrl), 2000);
@@ -144,8 +147,21 @@ export default function AgreementCreator() {
     setErrors({});
   };
 
-  const download = () => {
-    if (!data || !ready || !generated) return;
+  const history = useDocumentHistory({
+    kind: "agreements",
+    schema: agreementSchema,
+    onLoad: (snapshot: unknown) => {
+      changeData(agreementSchema.parse(snapshot));
+      setMobileTab("edit");
+    },
+    onReuse: (snapshot: unknown) => {
+      changeData(createAgreementDraftFromArchive(snapshot));
+      setMobileTab("edit");
+    },
+  });
+
+  const download = async () => {
+    if (!data || !ready || !generated || history.busy) return;
     const parsed = agreementSchema.safeParse(data);
     if (!parsed.success) {
       const fieldErrors: FormErrors = {};
@@ -167,13 +183,34 @@ export default function AgreementCreator() {
       }, 50);
       return;
     }
-    const link = document.createElement("a");
-    link.href = generated.url;
-    link.download = agreementFilename(data);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    toast.success("Agreement PDF downloaded.");
+    const snapshot = JSON.parse(JSON.stringify(data)) as AgreementData;
+    const filename = agreementFilename(snapshot);
+    try {
+      const result = await history.archiveDownload({
+        blob: generated.blob,
+        snapshot,
+        filename,
+        label: snapshot.clientName,
+        subtitle: snapshot.serviceType,
+        documentDate: snapshot.agreementDate,
+      });
+      if (result.status !== "saved") return;
+      const url = URL.createObjectURL(result.blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      toast.success("Agreement saved to shared history and PDF downloaded.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "The agreement could not be saved. Check your connection and retry.",
+      );
+    }
   };
 
   const newAgreement = () => {
@@ -210,10 +247,21 @@ export default function AgreementCreator() {
             </div>
           </div>
           <div className="header-actions">
+            {history.sessionActions}
+            <button
+              className="button button-outline button-small"
+              type="button"
+              onClick={history.openHistory}
+              disabled={history.busy}
+            >
+              <History size={16} />
+              Previous agreements
+            </button>
             <button
               className="button button-outline button-small"
               type="button"
               onClick={() => setNewDialog(true)}
+              disabled={history.busy}
             >
               <FilePlus2 size={16} />
               New agreement
@@ -222,14 +270,18 @@ export default function AgreementCreator() {
               className="button button-primary download-desktop"
               type="button"
               onClick={download}
-              disabled={!ready}
+              disabled={!ready || history.busy}
             >
-              {pending ? (
+              {pending || history.archiveBusy ? (
                 <LoaderCircle size={17} className="spin" />
               ) : (
                 <Download size={17} />
               )}
-              {pending ? "Generating PDF…" : "Download PDF"}
+              {history.archiveBusy
+                ? "Saving PDF…"
+                : pending
+                  ? "Generating PDF…"
+                  : "Save & download PDF"}
             </button>
           </div>
         </header>
@@ -291,7 +343,13 @@ export default function AgreementCreator() {
             role="region"
             aria-label="Edit agreement"
           >
-            <AgreementForm data={data} onChange={changeData} errors={errors} />
+            <fieldset className="form-lock" disabled={history.archiveBusy}>
+              <AgreementForm
+                data={data}
+                onChange={changeData}
+                errors={errors}
+              />
+            </fieldset>
           </div>
           <div
             className="preview-panel"
@@ -331,18 +389,23 @@ export default function AgreementCreator() {
             className="button button-primary"
             type="button"
             onClick={download}
-            disabled={!ready}
+            disabled={!ready || history.busy}
           >
-            {pending ? (
+            {pending || history.archiveBusy ? (
               <LoaderCircle size={17} className="spin" />
             ) : (
               <Download size={17} />
             )}
-            {pending ? "Generating PDF…" : "Download PDF"}
+            {history.archiveBusy
+              ? "Saving PDF…"
+              : pending
+                ? "Generating PDF…"
+                : "Save & download PDF"}
           </button>
         </div>
       </main>
 
+      {history.dialogs}
       <dialog
         ref={dialogRef}
         className="modal"
@@ -365,8 +428,8 @@ export default function AgreementCreator() {
         </div>
         <p className="modal-description">
           This replaces the current draft with blank client and caregiver
-          details and the default CarePal terms. Download the current agreement
-          first to keep a copy.
+          details and the default CarePal terms. Save the current agreement
+          first to keep it in shared history.
         </p>
         <div className="confirmation-actions">
           <button
